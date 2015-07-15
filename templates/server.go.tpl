@@ -4,7 +4,9 @@ import (
 	"log"
 	{{if eq .UseThrottle true}}"time"{{end}}
 
-	{{if eq .UseEtcd true}}"github.com/achilleasa/service-adapters/etcd"{{end}}
+	{{if eq .UseEtcd true}}"github.com/achilleasa/usrv-service-adapters/etcd"{{end}}
+	{{if eq .UseTracer true}}"github.com/achilleasa/usrv-tracer"
+    tracerMiddleware "github.com/achilleasa/usrv-tracer/middleware"{{end}}
 	"github.com/achilleasa/usrv"
 	{{if eq .UseThrottle true}}usrvMiddleware "github.com/achilleasa/usrv/middleware"{{end}}
 	"github.com/golang/protobuf/proto"
@@ -22,7 +24,7 @@ type Server struct {
 }
 
 // Create a new server using the supplied transport.
-func NewServer({{if eq .UseEtcd true}}etcdSrv *etcd.Etcd,{{end}} transport usrv.Transport, logger *log.Logger) (*Server, error) {
+func NewServer({{if eq .UseEtcd true}}etcdSrv *etcd.Etcd,{{end}}{{if eq .UseTracer true}}collector *tracer.Collector,{{end}} transport usrv.Transport, logger *log.Logger) (*Server, error) {
 	impl, err := usrv.NewServer(transport, usrv.WithLogger(logger))
 	if err != nil {
 		return nil, err
@@ -39,6 +41,7 @@ func NewServer({{if eq .UseEtcd true}}etcdSrv *etcd.Etcd,{{end}} transport usrv.
 		serviceEndpoint,
 		usrv.HandlerFunc(server.dispatchRequest),
 		// extra middleware
+		{{if eq .UseTracer true}}tracerMiddleware.Tracer(collector),{{end}}
 		{{if eq .UseThrottle true}}usrvMiddleware.Throttle({{.ThrottleMaxConcurrent}}, time.Millisecond * {{.ThrottleMaxExecTime}}),{{end}}
 	)
 	if err != nil {
@@ -56,7 +59,7 @@ func NewServer({{if eq .UseEtcd true}}etcdSrv *etcd.Etcd,{{end}} transport usrv.
 
 // This method is the main entry point for  requests to this service. If will automatically
 // unmarshal the raw payload into the expected protobuf message, invoke the actual service implementation
-// defined in service.go and then reply back to the client with the marshalled response message.
+// defined in service.go and then reply back to the client with the marshaled response message.
 func (server *Server) dispatchRequest(ctx context.Context, rw usrv.ResponseWriter, message *usrv.Message) {
 	// Unserialize request
 	request := &Request{}

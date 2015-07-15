@@ -11,7 +11,7 @@ go get "code.google.com/p/go-uuid/uuid"
 {{ if eq .UseEtcd true }}go get github.com/coreos/go-etcd/...
 go get github.com/ugorji/go/codec{{end}}
 go get -u github.com/golang/protobuf/{proto,protoc-gen-go}
-go get github.com/achilleasa/{service-adapters,usrv}
+go get github.com/achilleasa/{usrv-service-adapters,usrv}
 ```
 
 # Getting started
