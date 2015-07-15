@@ -13,18 +13,21 @@ import (
 
 // The set of accepted flags
 var (
-	outFolder                    = flag.String("out", "", "Output folder not including the service repo name (e.g. $GOPATH/github.com/foo)")
-	srvName                      = flag.String("srv-name", "", "Service name. A folder with the service name will be generated inside the output folder")
-	pkgFolder             string = ""
-	endpoint                     = flag.String("srv-endpoint", "", "Service endpoint. If omitted the service name will be used")
-	description                  = flag.String("srv-descr", "", "Service description")
-	initGitRepo                  = flag.Bool("init-git-repo", true, "Initialize a git repo at the output folder")
-	overwrite                    = flag.Bool("overwrite-files", false, "Overwrite files in output folder if the folder already exists")
-	useEtcd                      = flag.Bool("use-etcd", true, "Use etcd for service discovery")
-	useThrottle                  = flag.Bool("use-throttle", false, "Use request throttle middleware")
-	throttleMaxConcurrent        = flag.Int("throttle-max-concurrent", 1000, "Max concurrent service requests")
-	throttleMaxExecTime          = flag.Int("throttle-max-exec-time", 0, "Max execution time for a request in ms. No limit if set to 0")
-	useTracer                    = flag.Bool("use-tracer", false, "Use request tracing middleware")
+	srvPath               = flag.String("srv-path", "", "Service path (e.g github.com/foo/foo-srv)")
+	endpoint              = flag.String("srv-endpoint", "", "Service endpoint. If omitted the service name will be used")
+	description           = flag.String("srv-descr", "", "Service description")
+	initGitRepo           = flag.Bool("init-git-repo", true, "Initialize a git repo at the output folder")
+	overwrite             = flag.Bool("overwrite-files", false, "Overwrite files in output folder if the folder already exists")
+	useEtcd               = flag.Bool("etcd-enabled", true, "Use etcd for service discovery")
+	useThrottle           = flag.Bool("throttle-enabled", false, "Use request throttle middleware")
+	throttleMaxConcurrent = flag.Int("throttle-max-concurrent", 1000, "Max concurrent service requests")
+	throttleMaxExecTime   = flag.Int("throttle-max-exec-time", 0, "Max execution time for a request in ms. No limit if set to 0")
+	useTracer             = flag.Bool("tracer-enabled", true, "Use request tracing middleware")
+	tracerQueueSize       = flag.Int("tracer-queue-size", 1000, "Max concurrent trace messages in queue")
+	tracerTTL             = flag.Int("tracer-entry-ttl", 24*3600, "Trace entry TTL in seconds. TTL will be disabled if set to 0")
+
+	pkgFolder = ""
+	srvName   = ""
 )
 
 // Get the list of templates (*.tpl) under path. The method will scan the path recursively.
@@ -49,18 +52,21 @@ func getTemplates(path string) []string {
 func parseArgs() error {
 	flag.Parse()
 
-	if *outFolder == "" {
-		return fmt.Errorf("Please specify an output folder with the --out option")
+	gopath := os.Getenv("GOPATH")
+	if gopath == "" {
+		return fmt.Errorf("GOPATH env var not defined")
 	}
 
 	// Trim trailing slash if present
-	*outFolder = strings.TrimRight(*outFolder, "/")
+	*srvPath = strings.TrimRight(*srvPath, "/")
 
-	if *srvName == "" {
-		return fmt.Errorf("Please specify a service name the --srv-name option")
+	if *srvPath == "" {
+		return fmt.Errorf("Please specify the service path with the --srv-path option")
 	}
 
-	pkgFolder = fmt.Sprintf("%s/%s", *outFolder, *srvName)
+	srvName = (*srvPath)[strings.LastIndex(*srvPath, "/")+1:]
+
+	pkgFolder = fmt.Sprintf("%s/src/%s", gopath, *srvPath)
 	info, err := os.Stat(pkgFolder)
 	if err == nil {
 		if !info.IsDir() {
@@ -72,19 +78,19 @@ func parseArgs() error {
 	}
 
 	if *endpoint == "" {
-		*endpoint = *srvName
+		*endpoint = srvName
 	}
 	return nil
 }
 
 func initGit() error {
-	fmt.Printf("\r\u274C  Initing empty git repo at %s", pkgFolder)
+	fmt.Printf("\r\u274C  Initing empty git repo")
 	err := exec.Command("git", "init", pkgFolder).Run()
 	if err != nil {
-		fmt.Printf("\r\u274C  Initing empty git repo at %s", pkgFolder)
+		fmt.Printf("\r\u274C  Initing empty git repo\n")
 		return fmt.Errorf("Error initializing git repo: %s", err.Error())
 	}
-	fmt.Printf("\r\u2713  Initing empty git repo at %s\n", pkgFolder)
+	fmt.Printf("\r\u2713  Initing empty git repo\n")
 
 	return nil
 }
@@ -93,11 +99,12 @@ func initBindings() error {
 	fmt.Printf("\r\u274C  Creating initial protobuf bindings")
 	err := exec.Command(
 		"protoc",
-		fmt.Sprintf("--%s=%s", "go_out", "."),
+		fmt.Sprintf("--%s=%s", "go_out", pkgFolder),
+		fmt.Sprintf("--proto_path=%s", pkgFolder),
 		fmt.Sprintf("%s/messages.proto", pkgFolder),
 	).Run()
 	if err != nil {
-		fmt.Printf("\r\u274C  Creating initial protobuf bindings")
+		fmt.Printf("\r\u274C  Creating initial protobuf bindings\n")
 		return fmt.Errorf("Error running protoc: %s", err.Error())
 	}
 	fmt.Printf("\r\u2713  Creating initial protobuf bindings\n")
@@ -118,13 +125,17 @@ func genService() error {
 	// Build context
 	context := map[string]interface{}{
 		"PkgName":               "srv",
-		"SrvName":               *srvName,
+		"SrvPath":               *srvPath,
+		"SrvName":               srvName,
 		"SrvDescription":        *description,
 		"SrvEndpoint":           *endpoint,
 		"UseEtcd":               *useEtcd,
 		"UseThrottle":           *useThrottle,
 		"ThrottleMaxConcurrent": *throttleMaxConcurrent,
 		"ThrottleMaxExecTime":   *throttleMaxExecTime,
+		"UseTracer":             *useTracer,
+		"TracerQueueSize":       *tracerQueueSize,
+		"TracerTTL":             *tracerTTL,
 	}
 
 	// Execute templates
