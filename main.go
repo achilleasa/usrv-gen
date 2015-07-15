@@ -84,13 +84,13 @@ func parseArgs() error {
 }
 
 func initGit() error {
-	fmt.Printf("\r\u274C  Initing empty git repo")
+	fmt.Printf("\r\u274C  Init empty git repo")
 	err := exec.Command("git", "init", pkgFolder).Run()
 	if err != nil {
-		fmt.Printf("\r\u274C  Initing empty git repo\n")
+		fmt.Printf("\r\u274C  Init empty git repo\n")
 		return fmt.Errorf("Error initializing git repo: %s", err.Error())
 	}
-	fmt.Printf("\r\u2713  Initing empty git repo\n")
+	fmt.Printf("\r\u2713  Init empty git repo\n")
 
 	return nil
 }
