@@ -16,13 +16,24 @@ go get github.com/achilleasa/{usrv-service-adapters,usrv}
 
 # Getting started
 
+ToDo
 
 # Messages
 
+{{if eq .SrvMessageType "protobuf"}}
 This service uses protocol buffers. The service request and response messages are defined in the `messages.proto` file.
 Whenever you make a change to the .proto file you need to regenerate the go message bindings. To do this run:
 `go generate` inside your service folder.
+{{end}}
+{{if eq .SrvMessageType "json"}}
+This service uses json for serializing requests and responses. The service request and response messages are defined in
+the `messages.go` file.
+{{end}}
 
 # The client
 
+ToDo
+
 # Testing
+
+ToDo

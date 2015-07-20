@@ -1,4 +1,4 @@
-//go:generate protoc --go_out=. messages.proto
+{{if eq .SrvMessageType "protobuf"}}//go:generate protoc --go_out=. messages.proto{{end}}
 package {{ .PkgName }}
 
 import "golang.org/x/net/context"

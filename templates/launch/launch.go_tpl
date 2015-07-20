@@ -7,10 +7,7 @@ import (
 
 	"flag"
 
-	{{if eq .UseEtcd true}}
-	"github.com/achilleasa/usrv-service-adapters/service/etcd"
-	{{end}}
-
+	{{if eq .UseEtcd true}}"github.com/achilleasa/usrv-service-adapters/service/etcd"{{end}}
 	"github.com/achilleasa/usrv-service-adapters"
 	"github.com/achilleasa/usrv-service-adapters/service/amqp"
 	"github.com/achilleasa/usrv"
@@ -24,8 +21,7 @@ var (
 	etcdHosts           = flag.String("etcd-hosts", "", "A comma delimited list of etcd hosts for automatic service configuration. You may also specify the ETCD_HOSTS env var instead")
 )
 
-{{if eq .UseEtcd true}}
-func initEtcd() error {
+{{if eq .UseEtcd true}}func initEtcd() error {
 	// Check for etcd config. If present dial etcd adapter
 	// If no etcd cmdline arg is set, also check for ETCD_HOSTS env var
 	if *etcdHosts == "" {
@@ -88,13 +84,11 @@ func main() {
 	// Parse command line args
 	flag.Parse()
 
-	{{if eq .UseEtcd true}}
-	// Init etcd service
+	{{if eq .UseEtcd true}}// Init etcd service
 	err := initEtcd()
 	if err != nil {
 		logger.Fatal(err)
-	}
-	{{end}}
+	}{{end}}
 
 	// Init usrv transport
 	transportSrv, err := initTransport()

@@ -16,6 +16,7 @@ var (
 	srvPath               = flag.String("srv-path", "", "Service path (e.g github.com/foo/foo-srv)")
 	endpoint              = flag.String("srv-endpoint", "", "Service endpoint. If omitted the service name will be used")
 	description           = flag.String("srv-descr", "", "Service description")
+	messageType           = flag.String("srv-message-type", "protobuf", "The message serialization to use. One of 'protobuf' or 'json'")
 	initGitRepo           = flag.Bool("init-git-repo", true, "Initialize a git repo at the output folder")
 	overwrite             = flag.Bool("overwrite-files", false, "Overwrite files in output folder if the folder already exists")
 	useEtcd               = flag.Bool("etcd-enabled", true, "Use etcd for service discovery")
@@ -28,6 +29,11 @@ var (
 
 	pkgFolder = ""
 	srvName   = ""
+)
+
+const (
+	Protobuf = "protobuf"
+	Json     = "json"
 )
 
 // Get the list of templates (*.tpl) under path. The method will scan the path recursively.
@@ -79,6 +85,10 @@ func parseArgs() error {
 
 	if *endpoint == "" {
 		*endpoint = srvName
+	}
+
+	if *messageType != Protobuf && *messageType != Json {
+		return fmt.Errorf("Invalid service message type. Supported values are 'protobuf' and 'json'")
 	}
 	return nil
 }
@@ -145,6 +155,7 @@ func genService() error {
 		"SrvName":               srvName,
 		"SrvDescription":        *description,
 		"SrvEndpoint":           *endpoint,
+		"SrvMessageType":        *messageType,
 		"UseEtcd":               *useEtcd,
 		"UseThrottle":           *useThrottle,
 		"ThrottleMaxConcurrent": *throttleMaxConcurrent,
@@ -156,6 +167,13 @@ func genService() error {
 
 	// Execute templates
 	for _, tplFile := range getTemplates("templates") {
+		// Depending on the selected message type exclude either protobuf template or json template
+		if *messageType == Protobuf && strings.Contains(tplFile, "messages") {
+			continue
+		} else if *messageType == Json && strings.Contains(tplFile, ".proto") {
+			continue
+		}
+
 		// Strip the _tpl extension and the templates/ prefix
 		dstFilename := strings.Replace(
 			strings.Replace(tplFile, "_tpl", "", 1),
@@ -212,10 +230,12 @@ func genService() error {
 
 	fmt.Printf("\u2713  Service created successfully")
 
-	// Create initial bindings
-	err = initBindings()
-	if err != nil {
-		return err
+	// Create initial bindings when using protobuf
+	if *messageType == Protobuf {
+		err = initBindings()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Init git repo
@@ -227,7 +247,11 @@ func genService() error {
 	}
 
 	fmt.Println("\nNotes:")
-	fmt.Printf("- The service protobuf messages are defined in %s/messages.proto.\n  After making any changes to the .proto file run 'go generate' to rebuild the go bindings.\n", pkgFolder)
+	if *messageType == Protobuf {
+		fmt.Printf("- The service protobuf messages are defined in %s/messages.proto.\n  After making any changes to the .proto file run 'go generate' to rebuild the go bindings.\n", pkgFolder)
+	} else if *messageType == Json {
+		fmt.Printf("- The service messages are defined in %s/messages.go.\n", pkgFolder)
+	}
 	fmt.Printf("- Add your service implementation inside %s/service.go.\n", pkgFolder)
 	if *useEtcd {
 		fmt.Printf("- The service is set up to use etcd for automatic configuration.\n  See %s/README.md for more details.\n", pkgFolder)
@@ -240,19 +264,21 @@ func genService() error {
 }
 
 func main() {
-	// Preflight checks
-	_, err := exec.LookPath("protoc-gen-go")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "\u274C  protoc-gen-go not be located in your current $PATH\n   Try running: go get -u github.com/golang/protobuf/{proto,protoc-gen-go}\n")
-		os.Exit(1)
-	}
-
 	// Parse args
-	err = parseArgs()
+	err := parseArgs()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\u274C  %s\n\n", err.Error())
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// Preflight checks
+	if *messageType == Protobuf {
+		_, err = exec.LookPath("protoc-gen-go")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "\u274C  protoc-gen-go not be located in your current $PATH\n   Try running: go get -u github.com/golang/protobuf/{proto,protoc-gen-go}\n")
+			os.Exit(1)
+		}
 	}
 
 	// Create service

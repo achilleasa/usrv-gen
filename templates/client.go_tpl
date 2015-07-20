@@ -6,8 +6,8 @@ import (
 	"github.com/achilleasa/usrv"
 	"golang.org/x/net/context"
 
-
-	"github.com/golang/protobuf/proto"
+	{{if eq .SrvMessageType "protobuf"}}"github.com/golang/protobuf/proto"
+	{{else if eq .SrvMessageType "json"}}"encoding/json"{{end}}
 )
 
 // This struct defines the response of the Client request methods.
@@ -71,8 +71,10 @@ func (client *realClient) RequestWithTimeout(ctx context.Context, request *Reque
 	// returned channel
 	clientResChan := make(chan ServerResponse, 1)
 	go func() {
-		// serialize protobuf
+		{{if eq .SrvMessageType "protobuf"}}// serialize protobuf
 		payload, err := proto.Marshal(request)
+		{{else if eq .SrvMessageType "json"}}// serialize json
+		payload, err := json.Marshal(request){{end}}
 		if err != nil {
 			clientResChan <- ServerResponse{
 				Response: nil,
@@ -86,7 +88,8 @@ func (client *realClient) RequestWithTimeout(ctx context.Context, request *Reque
 
 		// Unserialize and emit response
 		response := &Response{}
-		err = proto.Unmarshal(res.Message.Payload, response)
+		{{if eq .SrvMessageType "protobuf"}}err = proto.Unmarshal(res.Message.Payload, response)
+		{{else if eq .SrvMessageType "json"}}err = json.Unmarshal(res.Message.Payload, response){{end}}
 		if err != nil {
 			response = nil
 		}

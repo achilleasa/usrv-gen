@@ -73,9 +73,18 @@ To exit a running server send it a `SIGINT` or press `ctrl+c` if running in inte
 
 # The request and response messages
 
+## Using protobuf (default)
 The generator defines a `Request` and `Response` protobuf message for the service. The protobuf messages are defined
 in the `messages.proto` file. If you make any changes to the `messages.proto` file you need to rebuild the go bindings via
 running `go generate` inside the service folder.
+
+
+## Using json
+
+If you want to use json instead of protocol buffers for your service pass the
+`srv-message-type=json` command-line option to the generator. In this case, the `Request` and
+`Response` objects will be defined inside the generated `messages.go` file.
+
 
 # License
 
