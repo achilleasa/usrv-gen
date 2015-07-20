@@ -1,0 +1,104 @@
+package {{ .PkgName }}
+
+import (
+	"log"
+
+	"golang.org/x/net/context"
+
+	"github.com/achilleasa/usrv-service-adapters/service/etcd"
+
+	{{if eq .UseTracer true}}
+	"time"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
+	"github.com/achilleasa/usrv-tracer"
+	tracerStorage "github.com/achilleasa/usrv-tracer/storage"
+	tracerMiddleware "github.com/achilleasa/usrv-tracer/middleware"
+	{{end}}
+
+	"github.com/achilleasa/usrv"
+	"github.com/achilleasa/usrv-service-adapters"
+
+	{{if eq .UseThrottle true}}
+	usrvMiddleware "github.com/achilleasa/usrv/middleware"
+	{{end}}
+
+	"github.com/golang/protobuf/proto"
+)
+
+{{if eq .UseTracer true}}
+func initCollector(logger *log.Logger) (*tracer.Collector, error) {
+
+	err := redis.Adapter.SetOptions(
+		adapters.Logger(logger),
+		etcd.AutoConf("/config/service/redis"),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return tracer.NewCollector(
+		tracerStorage.Redis,
+		{{ .TracerQueueSize }},
+		{{ .TracerTTL }} * time.Second,
+	)
+}
+{{end}}
+
+// Wrap HandleRequest method with a PipelineHandler that unserializes incoming
+// requests to the Request object, invokes HandleRequest method and serializes
+// the Response object
+func handlerWithCodec() usrv.Handler {
+	return usrv.PipelineHandler{
+		Decoder: func(payload []byte) (interface{}, error) {
+			request := &Request{}
+			return &request, proto.Unmarshal(payload, request)
+		},
+		Processor: func(ctx context.Context, req interface{}) (interface{}, error) {
+			// Add type check so we can invoke the service implementation
+			return HandleRequest(ctx, req.(*Request))
+		},
+		Encoder: func(payload interface{}) ([]byte, error) {
+			return proto.Marshal(payload.(*Response))
+		},
+	}
+}
+
+// Create a new server using the specified transport and logger. The server will be
+// bound to the endpoint defined inside service.go and is set up to invoke
+// the service handler defined inside service.go.
+func NewServer(transport usrv.Transport, logger *log.Logger) (*usrv.Server, error) {
+	//{{if eq .UseTracer true}}
+	// Init trace collector
+	collector, err := initCollector(logger)
+	if err != nil {
+		return nil, err
+	}
+	defer collector.Storage.Close()
+	//{{end}}
+
+	// Create server
+	server, err := usrv.NewServer(
+		transport,
+		usrv.WithLogger(logger),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Bind endpoint
+	err = server.Handle(
+		Endpoint,
+		handlerWithCodec(),
+		{{if eq .UseTracer true}}
+			tracerMiddleware.Tracer(collector),
+		{{end}}
+		{{if eq .UseThrottle true}}
+			usrvMiddleware.Throttle({{.ThrottleMaxConcurrent}}, time.Millisecond * {{.ThrottleMaxExecTime}}),
+		{{end}}
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return server, nil
+}

@@ -1,0 +1,19 @@
+//go:generate protoc --go_out=. messages.proto
+package {{ .PkgName }}
+
+import "golang.org/x/net/context"
+
+var (
+	Endpoint = "{{ .SrvEndpoint }}"
+)
+
+// Bootstrap the server. This method will be invoked when the service starts.
+// If this method returns a non-nil error, the server will exit.
+func InitService() error {
+	return nil
+}
+
+// Process an incoming service request.
+func HandleRequest(ctx context.Context, request *Request) (*Response, error) {
+	return &Response{}, nil
+}

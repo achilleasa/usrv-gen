@@ -1,0 +1,124 @@
+package main
+
+import (
+	"log"
+	"os"
+	"os/signal"
+
+	"flag"
+
+	{{if eq .UseEtcd true}}
+	"github.com/achilleasa/usrv-service-adapters/service/etcd"
+	{{end}}
+
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/service/amqp"
+	"github.com/achilleasa/usrv"
+	"github.com/achilleasa/usrv/transport"
+
+	srv "{{ .SrvPath }}"
+)
+
+var (
+	logger              = log.New(os.Stdout, "[{{ .SrvName }}] ", log.LstdFlags)
+	etcdHosts           = flag.String("etcd-hosts", "", "A comma delimited list of etcd hosts for automatic service configuration. You may also specify the ETCD_HOSTS env var instead")
+)
+
+{{if eq .UseEtcd true}}
+func initEtcd() error {
+	// Check for etcd config. If present dial etcd adapter
+	// If no etcd cmdline arg is set, also check for ETCD_HOSTS env var
+	if *etcdHosts == "" {
+		*etcdHosts = os.Getenv("ETCD_HOSTS")
+	}
+
+	// Finally falllback to the default
+	if *etcdHosts == "" {
+		*etcdHosts = "http://127.0.0.1:4001"
+	}
+
+	etcd.Adapter.SetOptions(
+		adapters.Logger(logger),
+		adapters.Config(map[string]string{"hosts": *etcdHosts}),
+	)
+	return etcd.Adapter.Dial()
+}{{end}}
+
+func initTransport() (usrv.Transport, error) {
+	// Init amqp service
+	err := amqp.Adapter.SetOptions(
+		adapters.Logger(logger),
+		{{if eq .UseEtcd true}}
+			etcd.AutoConf("/config/service/amqp"),
+		{{end}}
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	transport.Amqp.SetLogger(logger)
+
+	return transport.Amqp, nil
+}
+
+// Start processing incoming server requests in a separate go-routing. Returns an
+// error channel for reporting server errors.
+func startServer(server *usrv.Server,) <- chan error {
+	errChan := make(chan error)
+	go func() {
+		// Call service init function
+		err := srv.InitService()
+		if err != nil {
+			errChan <- err
+			close(errChan)
+		}
+
+		// Block until the server exits
+		err = server.ListenAndServe()
+		if err != nil {
+			errChan <- err
+		}
+		close(errChan)
+	}()
+
+	return errChan
+}
+
+func main() {
+	// Parse command line args
+	flag.Parse()
+
+	{{if eq .UseEtcd true}}
+	// Init etcd service
+	err := initEtcd()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	{{end}}
+
+	// Init usrv transport
+	transportSrv, err := initTransport()
+	if err != nil {
+		logger.Fatal(err)
+	}
+	defer transportSrv.Close()
+
+	// Create server
+	server, err := srv.NewServer(transportSrv, logger)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	defer server.Close()
+
+	// Register signal handler and block until we receive a signal or a server error
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, os.Interrupt)
+	errChan := startServer(server)
+
+	select {
+	case <-sigChan:
+		logger.Printf("[MAIN] Received SIGINT; shutting down\n")
+	case err = <-errChan:
+		logger.Fatalf("[MAIN] Caught: %v", err)
+	}
+}
