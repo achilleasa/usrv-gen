@@ -39,7 +39,7 @@ func getTemplates(path string) []string {
 			return nil
 		}
 
-		if strings.HasSuffix(info.Name(), ".tpl") {
+		if strings.HasSuffix(info.Name(), "_tpl") {
 			list = append(list, path)
 		}
 
@@ -112,6 +112,22 @@ func initBindings() error {
 	return nil
 }
 
+func formatCode() error {
+	fmt.Printf("\r\u274C  Running go fmt")
+	err := exec.Command(
+		"go",
+		"fmt",
+		fmt.Sprintf("%s/...", pkgFolder),
+	).Run()
+	if err != nil {
+		fmt.Printf("\r\u274C  Running go fmt\n")
+		return fmt.Errorf("Error running go fmt: %s", err.Error())
+	}
+	fmt.Printf("\r\u2713  Running go fmt\n")
+
+	return nil
+}
+
 func genService() error {
 
 	var err error
@@ -140,9 +156,9 @@ func genService() error {
 
 	// Execute templates
 	for _, tplFile := range getTemplates("templates") {
-		// Strip the .tpl extension and the templates/ prefix
+		// Strip the _tpl extension and the templates/ prefix
 		dstFilename := strings.Replace(
-			strings.Replace(tplFile, ".tpl", "", 1),
+			strings.Replace(tplFile, "_tpl", "", 1),
 			"templates/",
 			"",
 			1,
@@ -188,6 +204,12 @@ func genService() error {
 		fmt.Printf("\r\u2713  Processing: %s -> %s\n", tplFile, dstFilename)
 	}
 
+	// Run go-fmt
+	err = formatCode()
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("\u2713  Service created successfully")
 
 	// Create initial bindings
@@ -206,7 +228,7 @@ func genService() error {
 
 	fmt.Println("\nNotes:")
 	fmt.Printf("- The service protobuf messages are defined in %s/messages.proto.\n  After making any changes to the .proto file run 'go generate' to rebuild the go bindings.\n", pkgFolder)
-	fmt.Printf("- Add your service implementation inside %s/service_impl.go.\n", pkgFolder)
+	fmt.Printf("- Add your service implementation inside %s/service.go.\n", pkgFolder)
 	if *useEtcd {
 		fmt.Printf("- The service is set up to use etcd for automatic configuration.\n  See %s/README.md for more details.\n", pkgFolder)
 	}

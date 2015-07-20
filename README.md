@@ -37,6 +37,7 @@ Creating new usrv service at ~/go/src/github.com/foo/go-usrv-example
 ✓  Processing: templates/messages.proto_tpl -> messages.proto
 ✓  Processing: templates/server.go_tpl -> server.go
 ✓  Processing: templates/service.go_tpl -> service.go
+✓  Running go fmt
 ✓  Creating initial protobuf bindings
 ✓  Init empty git repo
 
