@@ -30,20 +30,20 @@ go run main.go \
    --etcd-enabled
 
 Creating new usrv service at ~/go/src/github.com/foo/go-usrv-example
-✓  Processing: templates/.gitignore.tpl -> .gitignore
-✓  Processing: templates/README.md.tpl -> README.md
-✓  Processing: templates/client.go.tpl -> client.go
-✓  Processing: templates/main/main.go.tpl -> main/main.go
-✓  Processing: templates/messages.proto.tpl -> messages.proto
-✓  Processing: templates/server.go.tpl -> server.go
-✓  Processing: templates/service_impl.go.tpl -> service_impl.go
+✓  Processing: templates/.gitignore_tpl -> .gitignore
+✓  Processing: templates/README.md_tpl -> README.md
+✓  Processing: templates/client.go_tpl -> client.go
+✓  Processing: templates/launch/launch.go_tpl -> launch/launch.go
+✓  Processing: templates/messages.proto_tpl -> messages.proto
+✓  Processing: templates/server.go_tpl -> server.go
+✓  Processing: templates/service.go_tpl -> service.go
 ✓  Creating initial protobuf bindings
 ✓  Init empty git repo
 
 Notes:
 - The service protobuf messages are defined in ~/go/src/github.com/foo/go-usrv-example/messages.proto.
   After making any changes to the .proto file run 'go generate' to rebuild the go bindings.
-- Add your service implementation inside ~/go/src/github.com/foo/go-usrv-example/service_impl.go.
+- Add your service implementation inside ~/go/src/github.com/foo/go-usrv-example/service.go.
 - The service is set up to use etcd for automatic configuration.
   See ~/go/src/github.com/foo/go-usrv-example/README.md for more details.
 - An empty git repo has been created for you.
@@ -51,18 +51,22 @@ Notes:
 
 # Service implementation details
 
-Add your service implementation details to the `service_impl.go` file. The same file also defines a bootstrap init
-function that you can hook to perform one-time initialization of your service, setup connections or create
-clients for the services you need e.t.c
+Add your service implementation details to the `service.go` file inside the `HandleRequest` method.
+
+The same file also defines the `InitService` function which will be invoked before the server starts.
+You can use this hook  to perform one-time initialization of your service, setup connections or create
+clients for the extenal services you need.
 
 # Building and running your service
 
-To build your server executable switch to the main folder inside the generated service and type:
+To build your server executable switch to the `launch` folder inside the generated service and type:
 `go build`
 
 To run the service just run the compiled executable. The service expects an etcd server to be available at
-`http://127.0.0.1:4001`. To use a different etcd host (e.g running inside a docker container) you just need
-to define the `ETCD_HOSTS` env var with a comma-delimited list of etcd hosts to try prior to running the server.
+`http://127.0.0.1:4001`. To use a different etcd host (e.g running inside a docker container) or a list
+ of multiple comma-delimited hosts you can either:
+- specify the `--etcd-hosts` command line argument
+- define the `ETCD_HOSTS` env var
 
 To exit a running server send it a `SIGINT` or press `ctrl+c` if running in interactive mode.
 
