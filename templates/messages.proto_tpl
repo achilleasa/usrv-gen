@@ -1,9 +1,11 @@
 package {{ .PkgName }};
 
-// The message for requests to the {{ .SrvName }} service
-message Request {
+{{range .SrvEndpoints}}
+// The message for requests to the {{$.SrvBaseEndpoint}}.{{.}} endpoint
+message {{.}}Req {
 }
 
-// The message for responses from the {{ .SrvName }} service
-message Response {
+// The message for responses from the {{$.SrvBaseEndpoint}}.{{.}} service
+message {{.}}Res {
 }
+{{end}}

@@ -1,9 +1,11 @@
 package {{ .PkgName }};
 
-// The message for requests to the {{ .SrvName }} service
-type Request struct {
+{{range .SrvEndpoints}}
+// The message for requests to the {{$.SrvBaseEndpoint}}.{{.}} endpoint
+type {{.}}Req struct {
 }
 
-// The message for responses from the {{ .SrvName }} service
-type Response struct {
+// The message for responses from the {{$.SrvBaseEndpoint}}.{{.}} service
+type {{.}}Res struct {
 }
+{{end}}

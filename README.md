@@ -15,15 +15,22 @@ This tool provides an easy way to bootstrap new usrv services for your applicati
 Please note that this package is still work in progress.
 
 The following example will generate service `go-usrv-example` under the `github.com/foo` folder inside the current
-go workspace (`GOPATH` needs to be present in your env vars or the generator will fail with an error). The service will
-listen for incoming requests on a queue named `com.foo.example`. It will throttle incoming requests to 1000 concurrent
-(no execution time limit) and log request/response trace entries to redis with a 1 day ttl.
+go workspace (`GOPATH` needs to be present in your env vars or the generator will fail with an error). The generated
+service will:
+- use etcd for configuration and amqp as the transport layer
+- expose an endpoint called `Foo` with the fully qualified name `com.foo.example.Foo`
+- expose an endpoint called `Bar` with the fully qualified name `com.foo.example.Bar`
+- generate protocol buffer stubs for request/response messages to the above endpoints and execute proto-c
+- throttle incoming requests (1000 concurrent, no exec limit)
+- log request/response traces to redis (also configured via etcd) with a 1-day TTL.
 
 ```
 go run main.go \
    --srv-path="github.com/foo/go-usrv-example" \
    --srv-descr="A description for the service" \
-   --srv-endpoint="com.foo.example" \
+   --srv-base="com.foo.example" \
+   --srv-name="Foo" \
+   --srv-name="Bar" \
    --throttle-enabled --throttle-max-concurrent=1000 --throttle-max-exec-time=0 \
    --tracer-enabled --tracer-queue-size=1000 --tracer-entry-ttl=86400 \
    --init-git-repo \
@@ -33,6 +40,7 @@ Creating new usrv service at ~/go/src/github.com/foo/go-usrv-example
 ✓  Processing: templates/.gitignore_tpl -> .gitignore
 ✓  Processing: templates/README.md_tpl -> README.md
 ✓  Processing: templates/client.go_tpl -> client.go
+✓  Processing: templates/endpoints.go_tpl -> endpoints.go
 ✓  Processing: templates/launch/launch.go_tpl -> launch/launch.go
 ✓  Processing: templates/messages.proto_tpl -> messages.proto
 ✓  Processing: templates/server.go_tpl -> server.go
@@ -52,11 +60,11 @@ Notes:
 
 # Service implementation details
 
-Add your service implementation details to the `service.go` file inside the `HandleRequest` method.
+Add your service implementation details to the `service.go` file inside each generated `Handler` method.
 
 The same file also defines the `InitService` function which will be invoked before the server starts.
 You can use this hook  to perform one-time initialization of your service, setup connections or create
-clients for the extenal services you need.
+clients for the external services you need.
 
 # Building and running your service
 
@@ -74,17 +82,15 @@ To exit a running server send it a `SIGINT` or press `ctrl+c` if running in inte
 # The request and response messages
 
 ## Using protobuf (default)
-The generator defines a `Request` and `Response` protobuf message for the service. The protobuf messages are defined
-in the `messages.proto` file. If you make any changes to the `messages.proto` file you need to rebuild the go bindings via
-running `go generate` inside the service folder.
-
+The generator defines a `Request` and `Response` protobuf message for the each exposed service endpoint. The protobuf
+messages are defined in the `messages.proto` file. If you make any changes to the `messages.proto` file you need to
+rebuild the go bindings via running `go generate` inside the service folder.
 
 ## Using json
 
 If you want to use json instead of protocol buffers for your service pass the
 `srv-message-type=json` command-line option to the generator. In this case, the `Request` and
 `Response` objects will be defined inside the generated `messages.go` file.
-
 
 # License
 

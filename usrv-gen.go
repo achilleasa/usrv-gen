@@ -11,11 +11,23 @@ import (
 	"text/template"
 )
 
+type endpointList []string
+
+func (e *endpointList) Set(value string) error {
+	// Accumulate endpoints when multiple options exists
+	*e = append(*e, value)
+	return nil
+}
+func (e *endpointList) String() string {
+	return fmt.Sprint(*e)
+}
+
 // The set of accepted flags
 var (
+	srvEndpoints          endpointList
 	srvPath               = flag.String("srv-path", "", "Service path (e.g github.com/foo/foo-srv)")
-	endpoint              = flag.String("srv-endpoint", "", "Service endpoint. If omitted the service name will be used")
-	description           = flag.String("srv-descr", "", "Service description")
+	srvBaseEndpoint       = flag.String("srv-base", "", "Service base endpoint. If omitted the service name will be used")
+	srvDescr              = flag.String("srv-descr", "", "Service description")
 	messageType           = flag.String("srv-message-type", "protobuf", "The message serialization to use. One of 'protobuf' or 'json'")
 	initGitRepo           = flag.Bool("init-git-repo", true, "Initialize a git repo at the output folder")
 	overwrite             = flag.Bool("overwrite-files", false, "Overwrite files in output folder if the folder already exists")
@@ -35,6 +47,10 @@ const (
 	Protobuf = "protobuf"
 	Json     = "json"
 )
+
+func init() {
+	flag.Var(&srvEndpoints, "srv-endpoint", "An endpoint name (e.g AddUser), You may specify multiple endpoints by repeating the --srv-endpoint flag")
+}
 
 // Get the list of templates (*.tpl) under path. The method will scan the path recursively.
 func getTemplates(path string) []string {
@@ -83,8 +99,12 @@ func parseArgs() error {
 		}
 	}
 
-	if *endpoint == "" {
-		*endpoint = srvName
+	if *srvBaseEndpoint == "" {
+		*srvBaseEndpoint = srvName
+	}
+
+	if len(srvEndpoints) == 0 {
+		return fmt.Errorf("You need to specify at least one endpoint name using the --srv-endpoint flag")
 	}
 
 	if *messageType != Protobuf && *messageType != Json {
@@ -153,9 +173,10 @@ func genService() error {
 		"PkgName":               "srv",
 		"SrvPath":               *srvPath,
 		"SrvName":               srvName,
-		"SrvDescription":        *description,
-		"SrvEndpoint":           *endpoint,
+		"SrvDescription":        *srvDescr,
 		"SrvMessageType":        *messageType,
+		"SrvBaseEndpoint":       *srvBaseEndpoint,
+		"SrvEndpoints":          srvEndpoints,
 		"UseEtcd":               *useEtcd,
 		"UseThrottle":           *useThrottle,
 		"ThrottleMaxConcurrent": *throttleMaxConcurrent,

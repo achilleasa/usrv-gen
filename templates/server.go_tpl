@@ -3,8 +3,6 @@ package {{ .PkgName }}
 import (
 	"log"
 
-	"golang.org/x/net/context"
-
 	"github.com/achilleasa/usrv-service-adapters/service/etcd"
 
 	{{if eq .UseTracer true}}"time"
@@ -17,8 +15,6 @@ import (
 	"github.com/achilleasa/usrv-service-adapters"
 
 	{{if eq .UseThrottle true}}usrvMiddleware "github.com/achilleasa/usrv/middleware"{{end}}
-	{{if eq .SrvMessageType "protobuf"}}"github.com/golang/protobuf/proto"
-	{{else if eq .SrvMessageType "json"}}"encoding/json"{{end}}
 )
 
 {{if eq .UseTracer true}}func initCollector(logger *log.Logger) (*tracer.Collector, error) {
@@ -37,27 +33,6 @@ import (
 		{{ .TracerTTL }} * time.Second,
 	)
 }{{end}}
-
-// Wrap HandleRequest method with a PipelineHandler that unserializes incoming
-// requests to the Request object, invokes HandleRequest method and serializes
-// the Response object
-func handlerWithCodec() usrv.Handler {
-	return usrv.PipelineHandler{
-		Decoder: func(payload []byte) (interface{}, error) {
-			request := &Request{}
-			{{if eq .SrvMessageType "protobuf"}}return &request, proto.Unmarshal(payload, request)
-			{{else if eq .SrvMessageType "json"}}return &request, json.Unmarshal(payload, request){{end}}
-		},
-		Processor: func(ctx context.Context, req interface{}) (interface{}, error) {
-			// Add type check so we can invoke the service implementation
-			return HandleRequest(ctx, req.(*Request))
-		},
-		Encoder: func(payload interface{}) ([]byte, error) {
-			{{if eq .SrvMessageType "protobuf"}}return proto.Marshal(payload.(*Response))
-			{{else if eq .SrvMessageType "json"}}return json.Marshal(payload){{end}}
-		},
-	}
-}
 
 // Create a new server using the specified transport and logger. The server will be
 // bound to the endpoint defined inside service.go and is set up to invoke
@@ -79,15 +54,17 @@ func NewServer(transport usrv.Transport, logger *log.Logger) (*usrv.Server, erro
 		return nil, err
 	}
 
-	// Bind endpoint
-	err = server.Handle(
-		Endpoint,
-		handlerWithCodec(),
-		{{if eq .UseTracer true}}tracerMiddleware.Tracer(collector),{{end}}
-		{{if eq .UseThrottle true}}usrvMiddleware.Throttle({{.ThrottleMaxConcurrent}}, time.Millisecond * {{.ThrottleMaxExecTime}}),{{end}}
-	)
-	if err != nil {
-		return nil, err
+	// Bind endpoints
+	for endpoint, handler := range endpointHandlers {
+		err = server.Handle(
+			endpoint,
+			handler,
+			{{if eq .UseTracer true}}tracerMiddleware.Tracer(collector),{{end}}
+			{{if eq .UseThrottle true}}usrvMiddleware.Throttle({{.ThrottleMaxConcurrent}}, time.Millisecond * {{.ThrottleMaxExecTime}}),{{end}}
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return server, nil
