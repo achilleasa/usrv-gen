@@ -25,12 +25,12 @@ service will:
 - log request/response traces to redis (also configured via etcd) with a 1-day TTL.
 
 ```
-go run main.go \
+go run usrv-gen.go \
    --srv-path="github.com/foo/go-usrv-example" \
    --srv-descr="A description for the service" \
    --srv-base="com.foo.example" \
-   --srv-name="Foo" \
-   --srv-name="Bar" \
+   --srv-endpoint="Foo" \
+   --srv-endpoint="Bar" \
    --throttle-enabled --throttle-max-concurrent=1000 --throttle-max-exec-time=0 \
    --tracer-enabled --tracer-queue-size=1000 --tracer-entry-ttl=86400 \
    --init-git-repo \
