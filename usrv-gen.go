@@ -189,7 +189,7 @@ func genService() error {
 	// Execute templates
 	for _, tplFile := range getTemplates("templates") {
 		// Depending on the selected message type exclude either protobuf template or json template
-		if *messageType == Protobuf && strings.Contains(tplFile, "messages") {
+		if *messageType == Protobuf && strings.Contains(tplFile, "messages.go") {
 			continue
 		} else if *messageType == Json && strings.Contains(tplFile, ".proto") {
 			continue
