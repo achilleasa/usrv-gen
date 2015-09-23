@@ -31,11 +31,11 @@ var (
 	messageType           = flag.String("srv-message-type", "protobuf", "The message serialization to use. One of 'protobuf' or 'json'")
 	initGitRepo           = flag.Bool("init-git-repo", true, "Initialize a git repo at the output folder")
 	overwrite             = flag.Bool("overwrite-files", false, "Overwrite files in output folder if the folder already exists")
-	useEtcd               = flag.Bool("etcd-enabled", true, "Use etcd for service discovery")
+	useEtcd               = flag.Bool("etcd-enabled", false, "Use etcd for service discovery")
 	useThrottle           = flag.Bool("throttle-enabled", false, "Use request throttle middleware")
 	throttleMaxConcurrent = flag.Int("throttle-max-concurrent", 1000, "Max concurrent service requests")
 	throttleMaxExecTime   = flag.Int("throttle-max-exec-time", 0, "Max execution time for a request in ms. No limit if set to 0")
-	useTracer             = flag.Bool("tracer-enabled", true, "Use request tracing middleware")
+	useTracer             = flag.Bool("tracer-enabled", false, "Use request tracing middleware")
 	tracerQueueSize       = flag.Int("tracer-queue-size", 1000, "Max concurrent trace messages in queue")
 	tracerTTL             = flag.Int("tracer-entry-ttl", 24*3600, "Trace entry TTL in seconds. TTL will be disabled if set to 0")
 
@@ -143,17 +143,17 @@ func initBindings() error {
 }
 
 func formatCode() error {
-	fmt.Printf("\r\u274C  Running go fmt")
+	fmt.Printf("\r\u274C  Running goimports")
 	err := exec.Command(
-		"go",
-		"fmt",
-		fmt.Sprintf("%s/...", pkgFolder),
+		"goimports",
+		"-w",
+		fmt.Sprintf("%s/", pkgFolder),
 	).Run()
 	if err != nil {
-		fmt.Printf("\r\u274C  Running go fmt\n")
-		return fmt.Errorf("Error running go fmt: %s", err.Error())
+		fmt.Printf("\r\u274C  Running goimports\n")
+		return fmt.Errorf("Error running goimports: %s", err.Error())
 	}
-	fmt.Printf("\r\u2713  Running go fmt\n")
+	fmt.Printf("\r\u2713  Running goimports\n")
 
 	return nil
 }
