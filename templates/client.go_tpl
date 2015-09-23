@@ -8,6 +8,8 @@ import (
 	"github.com/achilleasa/usrv"
 	"github.com/achilleasa/usrv/transport"
 
+  {{if eq .UseTracer true }}tracerMiddleware "github.com/achilleasa/usrv-tracer/middleware"{{end}}
+
 	{{if eq .SrvMessageType "protobuf"}}"github.com/golang/protobuf/proto"
 	{{else if eq .SrvMessageType "json"}}"encoding/json"{{end}}
 )
@@ -17,8 +19,14 @@ import (
 type Srv{{.}}Res struct {
 	Response *{{.}}Res
 	Error    error
+	CorrelationId string
+	{{if eq $.UseTracer true}}TraceId string{{end}}
 }
 {{end}}
+
+const (
+	NoTimeout time.Duration = 0
+)
 
 // The client interface is implemented by all clients (real and mock)
 type Client interface {
@@ -78,17 +86,20 @@ func (client *realClient) {{.}}(ctx context.Context, request *{{.}}Req, timeout 
 			clientResChan <- Srv{{.}}Res{
 				Response: nil,
 				Error:    err,
+				CorrelationId: "",
+				{{if eq $.UseTracer true }}TraceId: "",{{end}}
 			}
 			close(clientResChan)
 			return
 		}
 
-		res := <-client.impl.RequestWithTimeout(
+		srvResChan, correlationId := client.impl.RequestWithTimeout(
 			ctx,
 			&usrv.Message{Payload: payload},
 			timeout,
 			"{{$.SrvBaseEndpoint}}.{{.}}",
 		)
+		res := <- srvResChan
 
 		// Unserialize and emit response
 		response := &{{.}}Res{}
@@ -100,6 +111,8 @@ func (client *realClient) {{.}}(ctx context.Context, request *{{.}}Req, timeout 
 		clientResChan <- Srv{{.}}Res{
 			Response: response,
 			Error:    err,
+			CorrelationId : correlationId,
+			{{if eq $.UseTracer true }}TraceId: res.Message.Headers.Get(tracerMiddleware.CtxTraceId).(string),{{end}}
 		}
 		close(clientResChan)
 	}()

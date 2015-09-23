@@ -42,8 +42,7 @@ func NewServer(transport usrv.Transport, logger *log.Logger) (*usrv.Server, erro
 	collector, err := initCollector(logger)
 	if err != nil {
 		return nil, err
-	}
-	defer collector.Storage.Close(){{end}}
+	}{{end}}
 
 	// Create server
 	server, err := usrv.NewServer(

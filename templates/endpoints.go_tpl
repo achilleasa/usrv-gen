@@ -5,8 +5,7 @@ import (
 
 	"github.com/achilleasa/usrv"
 
-	{{if eq .SrvMessageType "protobuf"}}"github.com/golang/protobuf/proto"
-	{{else if eq .SrvMessageType "json"}}"encoding/json"{{end}}
+	{{if eq .SrvMessageType "protobuf"}}"github.com/golang/protobuf/proto"{{else if eq .SrvMessageType "json"}}"encoding/json"{{end}}
 )
 
 // The set of auto-generated handlers for each defined endpoint
@@ -16,16 +15,14 @@ var endpointHandlers = map[string]usrv.Handler {
 	"{{$.SrvBaseEndpoint}}.{{.}}": usrv.PipelineHandler{
 			Decoder: func(payload []byte) (interface{}, error) {
 				request := &{{.}}Req{}
-				{{if eq $.SrvMessageType "protobuf"}}return &request, proto.Unmarshal(payload, request)
-				{{else if eq $.SrvMessageType "json"}}return &request, json.Unmarshal(payload, request){{end}}
+				{{if eq $.SrvMessageType "protobuf"}}return request, proto.Unmarshal(payload, request){{else if eq $.SrvMessageType "json"}}return request, json.Unmarshal(payload, request){{end}}
 			},
 			Processor: func(ctx context.Context, req interface{}) (interface{}, error) {
 				// Add type check so we can invoke the service implementation
 				return {{.}}Handler(ctx, req.(*{{.}}Req))
 			},
 			Encoder: func(payload interface{}) ([]byte, error) {
-				{{if eq $.SrvMessageType "protobuf"}}return proto.Marshal(payload.(*{{.}}Res))
-				{{else if eq $.SrvMessageType "json"}}return json.Marshal(payload){{end}}
+				{{if eq $.SrvMessageType "protobuf"}}return proto.Marshal(payload.(*{{.}}Res)){{else if eq $.SrvMessageType "json"}}return json.Marshal(payload){{end}}
 			},
 		},{{end}}
 }
