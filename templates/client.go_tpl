@@ -100,19 +100,31 @@ func (client *realClient) {{.}}(ctx context.Context, request *{{.}}Req, timeout 
 			"{{$.SrvBaseEndpoint}}.{{.}}",
 		)
 		res := <- srvResChan
-
-		// Unserialize and emit response
-		response := &{{.}}Res{}
-		{{if eq $.SrvMessageType "protobuf"}}err = proto.Unmarshal(res.Message.Payload, response)
-		{{else if eq $.SrvMessageType "json"}}err = json.Unmarshal(res.Message.Payload, response){{end}}
-		if err != nil {
-			response = nil
+	
+		// Handle erros and unserialize response
+		var unserializedRes *{{.}}Res = nil
+		if res.Error != nil {
+			err = res.Error
+		} else {
+			unserializedRes = &{{.}}Res{}
+			{{if eq $.SrvMessageType "protobuf"}}err = proto.Unmarshal(res.Message.Payload, unserializedRes)
+			{{else if eq $.SrvMessageType "json"}}err = json.Unmarshal(res.Message.Payload, unserializedRes){{end}}
+			if err != nil {
+				unserializedRes = nil
+			}
 		}
+
+		{{if eq $.UseTracer true }}var traceId string
+		if res.Message.Headers.Get(tracerMiddleware.CtxTraceId) != nil {
+			traceId = res.Message.Headers.Get(tracerMiddleware.CtxTraceId).(string) 
+		}{{end}}
+		
+		// Unserialize and emit response
 		clientResChan <- Srv{{.}}Res{
-			Response: response,
+			Response: unserializedRes,
 			Error:    err,
 			CorrelationId : correlationId,
-			{{if eq $.UseTracer true }}TraceId: res.Message.Headers.Get(tracerMiddleware.CtxTraceId).(string),{{end}}
+			{{if eq $.UseTracer true }}TraceId: traceId,{{end}}
 		}
 		close(clientResChan)
 	}()
